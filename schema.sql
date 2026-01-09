@@ -1,5 +1,5 @@
 -- Use existing database
-USE sdc310L_hebert;
+USE sdc310l_hebert;
 
 CREATE TABLE IF NOT EXISTS products (
   product_id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
