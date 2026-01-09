@@ -1,82 +1,82 @@
 <?php
 declare(strict_types=1);
 
-function getSessionId(): string {
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-        session_start();
-    }
-    return session_id();
-}
+require_once 'database.php';
+require_once __DIR__ . '/lib/cart.php';
 
-function getCartItems(PDO $pdo): array {
-    $sid = getSessionId();
-    $sql = "SELECT p.product_id, p.name, p.cost, c.quantity,
-                   (p.cost * c.quantity) AS line_total
-            FROM cart_items c
-            JOIN products p ON p.product_id = c.product_id
-            WHERE c.session_id = :sid AND c.quantity > 0
-            ORDER BY p.product_id";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(['sid' => $sid]);
-    return $stmt->fetchAll();
-}
+$cartItems = getCartItems($pdo);
+$totals = calculateTotals($cartItems);
+?>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Your Cart</title>
+</head>
+<body>
 
-function addToCart(PDO $pdo, int $productId, int $qtyToAdd): void {
-    $sid = getSessionId();
-    $qtyToAdd = max(1, $qtyToAdd);
+  <h1>Your Cart</h1>
 
-    // If row exists, update; else insert
-    $sql = "INSERT INTO cart_items (session_id, product_id, quantity)
-            VALUES (:sid, :pid, :qty)
-            ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(['sid' => $sid, 'pid' => $productId, 'qty' => $qtyToAdd]);
-}
+  <p><a href="index.php">← Continue Shopping</a></p>
 
-function updateCartQuantity(PDO $pdo, int $productId, int $newQty): void {
-    $sid = getSessionId();
-    $newQty = max(0, $newQty);
+  <?php if (count($cartItems) === 0): ?>
+    <p>Your cart is empty.</p>
+  <?php else: ?>
 
-    if ($newQty === 0) {
-        removeFromCart($pdo, $productId);
-        return;
-    }
+    <table border="1" cellpadding="8" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Product ID</th>
+          <th>Product Name</th>
+          <th>Quantity</th>
+          <th>Cost (each)</th>
+          <th>Line Total</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
 
-    $sql = "UPDATE cart_items
-            SET quantity = :qty
-            WHERE session_id = :sid AND product_id = :pid";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(['qty' => $newQty, 'sid' => $sid, 'pid' => $productId]);
-}
+      <?php foreach ($cartItems as $item): ?>
+        <tr>
+          <td><?= (int)$item['product_id'] ?></td>
+          <td><?= htmlspecialchars($item['name']) ?></td>
+          <td>
+            <form method="post" action="cart_actions.php" style="display:inline;">
+              <input type="hidden" name="action" value="update">
+              <input type="hidden" name="product_id" value="<?= (int)$item['product_id'] ?>">
+              <input type="number" name="quantity" min="0" value="<?= (int)$item['quantity'] ?>">
+              <button type="submit">Update</button>
+            </form>
+          </td>
+          <td>$<?= number_format((float)$item['cost'], 2) ?></td>
+          <td>$<?= number_format((float)$item['line_total'], 2) ?></td>
+          <td>
+            <form method="post" action="cart_actions.php" style="display:inline;">
+              <input type="hidden" name="action" value="remove">
+              <input type="hidden" name="product_id" value="<?= (int)$item['product_id'] ?>">
+              <button type="submit">Remove</button>
+            </form>
+          </td>
+        </tr>
+      <?php endforeach; ?>
 
-function removeFromCart(PDO $pdo, int $productId): void {
-    $sid = getSessionId();
-    $sql = "DELETE FROM cart_items
-            WHERE session_id = :sid AND product_id = :pid";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(['sid' => $sid, 'pid' => $productId]);
-}
+      </tbody>
+    </table>
 
-function clearCart(PDO $pdo): void {
-    $sid = getSessionId();
-    $sql = "DELETE FROM cart_items WHERE session_id = :sid";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(['sid' => $sid]);
-}
+    <h2>Order Summary</h2>
+    <ul>
+      <li>Total of items ordered (subtotal): $<?= number_format((float)$totals['subtotal'], 2) ?></li>
+      <li>Tax (5%): $<?= number_format((float)$totals['tax'], 2) ?></li>
+      <li>Shipping &amp; Handling (10%): $<?= number_format((float)$totals['shipping'], 2) ?></li>
+      <li><strong>Order Total:</strong> $<?= number_format((float)$totals['order_total'], 2) ?></li>
+    </ul>
 
-function calculateTotals(array $cartItems): array {
-    $subtotal = 0.0;
-    foreach ($cartItems as $item) {
-        $subtotal += (float)$item['line_total'];
-    }
-    $tax = $subtotal * 0.05;
-    $shipping = $subtotal * 0.10;
-    $orderTotal = $subtotal + $tax + $shipping;
+    <form method="post" action="cart_actions.php">
+      <input type="hidden" name="action" value="checkout">
+      <button type="submit">Check Out</button>
+    </form>
 
-    return [
-        'subtotal' => $subtotal,
-        'tax' => $tax,
-        'shipping' => $shipping,
-        'order_total' => $orderTotal,
-    ];
-}
+  <?php endif; ?>
+
+</body>
+</html>
