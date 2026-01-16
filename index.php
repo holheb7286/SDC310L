@@ -1,42 +1,29 @@
 <?php
-require_once 'database.php';
+declare(strict_types=1);
 
-$stmt = $pdo->query("SELECT * FROM products");
-$products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-?>
+require_once __DIR__ . '/database.php';
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Product Catalog</title>
-</head>
-<body>
+// models
+require_once __DIR__ . '/app/models/ProductModel.php';
+require_once __DIR__ . '/app/models/CartModel.php';
 
-<h1>Product Catalog</h1>
+// controllers
+require_once __DIR__ . '/app/controllers/CatalogController.php';
+require_once __DIR__ . '/app/controllers/CartController.php';
 
-<p><a href="cart.php">View Cart</a></p>
+$page = $_GET['page'] ?? 'catalog';
 
-<?php foreach ($products as $product): ?>
-    <p>
-        <strong><?= htmlspecialchars($product['name']) ?></strong><br>
-        <?= htmlspecialchars($product['description']) ?><br>
-        $<?= number_format($product['cost'], 2) ?><br>
-        In stock: <?= $product['quantity_on_hand'] ?>
-    </p>
+switch ($page) {
+    case 'cart':
+        (new CartController($mysqli))->index();
+        break;
 
-<form method="post" action="cart_actions.php">
-    <input type="hidden" name="action" value="add">
-    <input type="hidden" name="product_id" value="<?= (int)$product['product_id'] ?>">
+    case 'cart_action':
+        (new CartController($mysqli))->handlePost();
+        break;
 
-    <label>
-        Qty:
-        <input type="number" name="quantity" value="1" min="1">
-    </label>
-
-    <button type="submit">Add to Cart</button>
-</form>
-
-<?php endforeach; ?>
-
-</body>
-</html>
+    case 'catalog':
+    default:
+        (new CatalogController($mysqli))->index();
+        break;
+}

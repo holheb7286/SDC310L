@@ -7,16 +7,14 @@ $user = 'root';
 $pass = '';
 $charset = 'utf8mb4';
 
-$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
+/**
+ * Enable mysqli exceptions so errors behave similarly to PDO::ERRMODE_EXCEPTION
+ */
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    $pdo = new PDO($dsn, $user, $pass, $options);
-} catch (PDOException $e) {
+    $mysqli = new mysqli($host, $user, $pass, $db);
+    $mysqli->set_charset($charset);
+} catch (mysqli_sql_exception $e) {
     die('Database connection failed: ' . $e->getMessage());
 }
